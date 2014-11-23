@@ -1,0 +1,17 @@
+<?php
+     $arr = array(1,2,3);
+	foreach($arr as &$number) {
+		$number *= $number;
+		echo "foreach",debug_zval_dump('arr'),"\n";
+		$test = 0;
+	}
+	for($i=0; $i<=2; $i++) {
+	}
+	echo $test,$i;
+	return false;
+	$number = 0;
+//	unset($number);
+	debug_zval_dump($number);
+	debug_zval_dump($arr);
+
+?>
