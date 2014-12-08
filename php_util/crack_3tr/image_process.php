@@ -1,5 +1,5 @@
 <?php
-$file_path = 'getPassCodeNew1.png';
+$file_path = 'getPassCodeNew_book.png';
 function image_process($file_path)
 {
 	$res = imagecreatefrompng($file_path); 
@@ -7,13 +7,15 @@ function image_process($file_path)
 	for($i=0; $i < $size[1]; ++$i) {
         for($j=0; $j < $size[0]; ++$j) {
 				$rgb = imagecolorat($res,$j,$i);
-				$rgbarray = imagecolorsforindex($res, $rgb);
-				$r= $rgbarray['red'] * 0.25;
-				$g= $rgbarray['green'] * 0.25;
-				$b= $rgbarray['blue'] * 0.25;
-				$t= round(($r+$g+$b) /128);
+				$rgbarr = imagecolorsforindex($res, $rgb);
+				if($rgbarr['red'])
+				echo var_dump($rgbarr), PHP_EOL;
+				$r= $rgbarr['red'] * 0.33;
+				$g= $rgbarr['green'] * 0.33;
+				$b= $rgbarr['blue'] * 0.33;
+				$t= round(($r+$g+$b) /255);
 
-				if($t == 0) {
+				if($t == 0) {//$r !=202
 					$data[$i][$j]=1;
 				}else {
 					$data[$i][$j]=0;
