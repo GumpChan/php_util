@@ -1,5 +1,5 @@
 <?php
-$file_path = 'getPassCodeNew_book.png';
+$file_path = 'getPassCodeNew1.png';
 function image_process($file_path)
 {
 	$res = imagecreatefrompng($file_path); 
