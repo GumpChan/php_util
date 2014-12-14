@@ -41,22 +41,26 @@ $cookie_dir = tempnam(__DIR__.'/cookie','cookie');
 function search_trains($search_url, $time = null)
 {
 	$fp = fopen('log.html','w');
-	$xyz = request($search_url);
-	$arr = json_decode($xyz);
-	$data = $arr->data;
 	$flag = 1;
+	echo '时间：', $time, PHP_EOL;
 	while($flag) {
 		$xyz = request($search_url);
 		$arr = json_decode($xyz);
+		if(!isset($arr->data)) {
+		echo '查询失败', PHP_EOL;	
+		//continue;
+		} else {
 		$data = $arr->data;
 		echo '车次：', $data[18]->queryLeftNewDTO->station_train_code, PHP_EOL;
 		echo '软卧：', $data[18]->queryLeftNewDTO->rw_num, ' 硬卧：', $data[17]->queryLeftNewDTO->yw_num, PHP_EOL;
 		echo '车次：', $data[17]->queryLeftNewDTO->station_train_code, PHP_EOL;
 		echo '软卧：', $data[17]->queryLeftNewDTO->rw_num, ' 硬卧：', $data[17]->queryLeftNewDTO->yw_num, PHP_EOL;
+		}
 		sleep(1);
 	}
 	return false;
 	foreach($data as $data) { //18,19
+	echo '时间：', $time;
 	echo '车次：', $data->queryLeftNewDTO->station_train_code, PHP_EOL;
 	echo '软卧：', $data->queryLeftNewDTO->rw_num, ' 硬卧：', $data->queryLeftNewDTO->yw_num, PHP_EOL;
 	}
@@ -68,7 +72,7 @@ function search_trains($search_url, $time = null)
 $val['time'] = isset($val['time'])?date('Y-m-d',strtotime($val['time'])):date('Y-m-d',strtotime('+68 day'));
 $search_rul = 'https://kyfw.12306.cn/otn/lcxxcx/query?purpose_codes=ADULT&queryDate=2015-02-16&from_station=BJP&to_station=CCT';
 $search_url_logined = 'https://kyfw.12306.cn/otn/leftTicket/queryT?leftTicketDTO.train_date='.$val['time'].'&leftTicketDTO.from_station=BJP&leftTicketDTO.to_station=CCT&purpose_codes=ADULT';
-search_trains($search_url_logined);
+search_trains($search_url_logined, $val['time']);
 
 
 
