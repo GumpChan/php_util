@@ -4,7 +4,7 @@ function dataRead()
 	
 	echo 'mem_usage_start:',memory_get_usage()/(1024*1024)," M\n";
 	$process_start_time = time();
-	$sets = fileRead('login.log');
+	$sets = fileRead('../login.log');
 	return false;
 	$dau = array();
 	foreach($sets as $set ) {
