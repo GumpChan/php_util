@@ -1,0 +1,181 @@
+<?php
+ini_set('display_errors','off');
+class db
+{
+    private $db_config_path = '';
+    private $dbms = '';
+    private $host = ';
+    private $port = '';
+    private $dbName = '';
+    private $user = '';
+    private $pwd = '';
+    public  $db = "";
+    public  $dsn = "";
+    public static $connection = "";
+    public $sql;
+    public $vendor_table = 't_swan_unique_device_info';
+
+    private function __construct(){
+        //$this->parseDBConfig(file_get_contents($this->db_config_path),  $this->dbName);
+        $this->dsn = "{$this->dbms}:host={$this->host};port={$this->port};dbname={$this->dbName}";
+        $this->connection();
+    }
+
+    function parseDBConfig($config_file, $dbName)
+    {
+        $config_arr = explode(PHP_EOL,$config_file); //待优化
+        foreach($config_arr as $config) {
+            if(strpos($config, $this->dbName)) {
+                break;
+            }
+        }
+        preg_match("/host=([\w.]+)\s/", $config,$matches);
+        $this->host = $matches[1];
+        preg_match("/port=([\w.]+)\s/", $config,$matches);
+        $this->port = $matches[1];
+        preg_match("/user=([\w.]+)\s/", $config,$matches);
+        $this->user =  $matches[1];
+        preg_match("/pass=([\w.]+)\s/", $config,$matches);
+        $this->pwd =  $matches[1];
+    }
+
+
+    static function getInstance()
+    {
+        if(self::$connection == "") {
+            self::$connection = new self;
+        }
+            return self::$connection;
+    }
+
+    private function connection()
+    {
+        $con = new PDO($this->dsn,$this->user,$this->pwd);
+        $con->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+        $this->db = $con;
+    }
+
+    function exec($params)
+    {
+        $prepare = $this->db->prepare($this->sql);
+        return $prepare->execute($params);
+    }
+
+    function inConditionSearch($key,$params)
+    {
+        $sql_params = implode(',',array_fill(0,count($params),'?'));
+        $this->sql .= " and $key IN ($sql_params)";
+        $statement = $this->db->prepare($this->sql);
+        $index = 1;
+        foreach($params as $val) {
+                $statement->bindValue($index++,$val);
+        }
+        $statement->execute();
+        return $statement->fetchAll();
+    }
+}
+define("SEARCH_MAX_AMOUNT" ,1800000);
+define("COUNT_JSON_PATH" ,'./count.json');
+define("COUNT_JSON_PATH_BAK" ,'./count.error.json');
+define('COUNT_JSON_PATH_LOG','./count.log');
+define("IDFA_LOG_PATH",'./');
+date_default_timezone_set('PRC');
+
+if(strlen($_REQUEST['idfa'])>72000)
+    return;
+$idfas_arr = explode(',',$_REQUEST['idfa']);
+if(count($idfas_arr) >1000) {
+    echo json_encode(
+               array(
+                       'ret' => 0,
+                       'msg' => 'idfa数量超限'
+       ));
+    return ;
+}
+
+if(!isset($idfas_arr)||empty($idfas_arr)||empty($_REQUEST['idfa'])) {
+    echo json_encode(
+            array(
+                    'ret' => 0,
+                    'msg' => 'idfa数量为空'
+            )
+    );
+    return;
+}
+
+$fp = fopen(COUNT_JSON_PATH, 'r');
+if(flock($fp, LOCK_SH)) { 
+    $search_amount = json_decode(fread($fp, filesize(COUNT_JSON_PATH)),true);
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
+if(isset($search_amount[date('Y-m-d')]) && ($search_amount[date('Y-m-d')]['total'] > SEARCH_MAX_AMOUNT)) {
+     echo json_encode(
+               array(
+                       'ret' => 0,
+                       'msg' => 'idfa当天查询条数超限'
+       ));
+    return ;
+}
+
+try {
+    $pdo = db::getInstance();
+    $data_time = date('Y-m-d');
+    $pdo->sql  = "select device_code from t_swan_unique_device_info where 1=1 ";
+    $data = $pdo->inConditionSearch('device_code',$idfas_arr);
+}catch(Exception $ex) {
+    echo json_encode(
+            array(
+                    'ret' => 0,
+                    'msg' => '发生错误',
+            )
+         );
+    return ;
+}
+$idfas =array_map(function($value){ return 0;},array_flip($idfas_arr));
+$ret = array();
+foreach($data as $val) {
+    $ret[$val['device_code']] = 1;
+}
+$valid = $ret;
+
+echo json_encode($ret + $idfas);
+$fp = fopen(COUNT_JSON_PATH, "r+");
+if(flock($fp, LOCK_EX)) {
+    $search_amount = json_decode(fread($fp,  filesize(COUNT_JSON_PATH)),true);
+    if(empty($search_amount)) {
+        $fp = fopen(COUNT_JSON_PATH_BAK, "w+");
+        $fp_log = fopen(COUNT_JSON_PATH_LOG, "a+");
+        fwrite($fp_log,error_get_last());
+    }
+    if(!isset($search_amount[date('Y-m-d')])) {
+        $search_amount[date('Y-m-d')] = array();
+        $search_amount[date('Y-m-d')]['start_time'] = date('Y-m-d H:i:s');
+        $search_amount[date('Y-m-d')]['total'] = count($idfas_arr);
+        $search_amount[date('Y-m-d')]['valid'] = count($valid);
+    }else {
+        $search_amount[date('Y-m-d')]['end_time'] = date('Y-m-d H:i:s');
+        $search_amount[date('Y-m-d')]['total'] += count($idfas_arr);
+        $search_amount[date('Y-m-d')]['valid'] += count($valid);
+    }
+    $search_amount[date('Y-m-d')]['rate'] = round( $search_amount[date('Y-m-d')]['valid']/$search_amount[date('Y-m-d')]['total'],2);
+    fseek($fp, 0, SEEK_SET);
+    fwrite($fp, json_encode($search_amount));
+    if(isset($fp_log)) {
+        fwrite($fp_log,error_get_last());
+        fclose($fp_log);
+    }
+    flock($fp, LOCK_UN);
+}
+fclose($fp);
+
+$log_file_name = IDFA_LOG_PATH.'idfa'.date('Ymd');
+$log_fp = fopen($log_file_name,"a+");
+if(flock($log_fp,LOCK_EX)) {
+    $log_rows = implode(PHP_EOL, $idfas_arr).PHP_EOL;
+    fwrite($log_fp,$log_rows);
+    flock($log_fp, LOCK_UN);
+}
+fclose($log_fp);
+?>
